@@ -1,8 +1,14 @@
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
 
   const { prompt } = req.body;
   const apiKey = process.env.GEMINI_API_KEY;
+
+  if (!apiKey) {
+    return res.status(500).json({ reply: "API Key is missing in Vercel settings." });
+  }
 
   try {
     const response = await fetch(
@@ -10,14 +16,21 @@ export default async function handler(req, res) {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }]
+        })
       }
     );
 
     const data = await response.json();
-    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "No response.";
-    res.status(200).json({ reply });
+
+    if (!response.ok) {
+      return res.status(500).json({ reply: `API Error: ${data.error?.message || "Unknown error"}` });
+    }
+
+    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "No text returned.";
+    return res.status(200).json({ reply });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to communicate with AI model.' });
+    return res.status(500).json({ reply: `Server Error: ${error.message}` });
   }
 }
